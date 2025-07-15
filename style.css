@@ -1,0 +1,9 @@
+*{box-sizing:border-box;margin:0;padding:0}
+    [hidden]{display:none!important}
+    body{background:#111;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;user-select:none}
+    canvas{background:#000;border:2px solid #555;image-rendering:pixelated;cursor:pointer}
+    #overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(2px);text-align:center;gap:16px}
+    #overlay h1{font-size:72px;letter-spacing:4px;text-shadow:0 0 12px #0ff,0 0 24px #0ff}
+    #overlay .accent{color:#0ff;text-shadow:0 0 8px #fff}
+    #overlay p{font-size:20px}
+    button{padding:10px 24px;font-size:20px;border:none;border-radius:8px;cursor:pointer}

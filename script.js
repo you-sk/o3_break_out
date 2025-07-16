@@ -16,22 +16,25 @@
     let score=0,highScore=Number(localStorage.getItem('breakoutHighScore'))||0;
     let lives=3,stage=1,running=false,ballAttached=true;
     let leftPressed=false,rightPressed=false;
+    let powerBallActive=false,powerBallTimer=null;
 
     /* Const */
     const ROWS=5,COLS=10,BRICK_W=70,BRICK_H=20,BRICK_PADDING=10,OFFSET_TOP=60;
     const PADDLE_W_DEFAULT=120,PADDLE_H=16,PADDLE_Y=H-40;
     const BALL_RADIUS=8,BALL_SPEED=5,PADDLE_SPEED=8;
     const PARTICLE_CNT=8,PARTICLE_LIFE=30;
-    const ITEM_SIZE=12,ITEM_SPEED=3,ITEM_CHANCE=0.2;
+    const ITEM_SIZE=12,ITEM_SPEED=3,ITEM_CHANCE=0.25;
     const itemTypes={
       PADDLE_WIDEN:{color:'#6f6',symbol:'W'},
       MULTI_BALL:{color:'#f99',symbol:'M'},
+      POWER_BALL:{color:'#ff6',symbol:'P'},
+      LIFE_UP:{color:'#6ff',symbol:'♥'},
     };
 
     /* Build bricks */
-    function buildBricks(){const tot=COLS*BRICK_W+(COLS-1)*BRICK_PADDING,off=(W-tot)/2;bricks=Array.from({length:ROWS},(_,r)=>Array.from({length:COLS},(_,c)=>({x:off+c*(BRICK_W+BRICK_PADDING),y:OFFSET_TOP+r*(BRICK_H+BRICK_PADDING),status:1})))}
+    function buildBricks(){const tot=COLS*BRICK_W+(COLS-1)*BRICK_PADDING,off=(W-tot)/2;bricks=Array.from({length:ROWS},(_,r)=>Array.from({length:COLS},(_,c)=>{const hp=stage>2&&r<2?2:1;return{x:off+c*(BRICK_W+BRICK_PADDING),y:OFFSET_TOP+r*(BRICK_H+BRICK_PADDING),hp}}))}
 
-    function resetBall(){balls=[{x:paddle.x+paddle.w/2,y:PADDLE_Y-BALL_RADIUS,dx:BALL_SPEED,dy:-BALL_SPEED}];ballAttached=true;paddle.w=PADDLE_W_DEFAULT;}
+    function resetBall(){balls=[{x:paddle.x+paddle.w/2,y:PADDLE_Y-BALL_RADIUS,dx:BALL_SPEED,dy:-BALL_SPEED}];ballAttached=true;paddle.w=PADDLE_W_DEFAULT;powerBallActive=false;clearTimeout(powerBallTimer);}
 
     function newGame(){score=0;lives=3;stage=1;leftPressed=rightPressed=false;paddle={x:(W-PADDLE_W_DEFAULT)/2,w:PADDLE_W_DEFAULT,h:PADDLE_H};resetBall();buildBricks();particles=[];items=[];running=true;overlay.hidden=true;requestAnimationFrame(loop);}
 
@@ -45,17 +48,17 @@
     /* Items */
     function spawnItem(x,y){if(Math.random()>ITEM_CHANCE)return;const typeKeys=Object.keys(itemTypes);const type=typeKeys[Math.floor(Math.random()*typeKeys.length)];items.push({x,y,type});}
     function updateItems(){items=items.filter(i=>i.y<H);for(const item of items){item.y+=ITEM_SPEED;if(item.y+ITEM_SIZE>PADDLE_Y&&item.x>paddle.x&&item.x<paddle.x+paddle.w){applyItemEffect(item.type);items=items.filter(i2=>i2!==item);beep(900,0.1,'sine');}}}
-    function applyItemEffect(type){if(type==='PADDLE_WIDEN'){paddle.w=Math.min(W,paddle.w+40);setTimeout(()=>paddle.w=PADDLE_W_DEFAULT,8000);}else if(type==='MULTI_BALL'){const newBall={...balls[0]};newBall.dx*=-1;balls.push(newBall);}}
+    function applyItemEffect(type){if(type==='PADDLE_WIDEN'){paddle.w=Math.min(W,paddle.w+40);setTimeout(()=>paddle.w=PADDLE_W_DEFAULT,8000);}else if(type==='MULTI_BALL'){const newBall={...balls[0]};newBall.dx*=-1;balls.push(newBall);}else if(type==='POWER_BALL'){powerBallActive=true;clearTimeout(powerBallTimer);powerBallTimer=setTimeout(()=>powerBallActive=false,8000);}else if(type==='LIFE_UP'){lives++;}}
     function drawItems(){items.forEach(i=>{const def=itemTypes[i.type];ctx.fillStyle=def.color;ctx.fillRect(i.x,i.y,ITEM_SIZE,ITEM_SIZE);ctx.fillStyle='#000';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(def.symbol,i.x+ITEM_SIZE/2,i.y+ITEM_SIZE/2+1);});ctx.textAlign='left';ctx.textBaseline='alphabetic';}
 
     /* Draw */
-    function drawBricks(){bricks.forEach(row=>row.forEach(b=>{if(b.status){ctx.fillStyle=`hsl(${(b.y/ROWS)*100},80%,50%)`;ctx.fillRect(b.x,b.y,BRICK_W,BRICK_H);}}));}
+    function drawBricks(){bricks.forEach(row=>row.forEach(b=>{if(b.hp>0){const lightness=b.hp===1?50:30;ctx.fillStyle=`hsl(${(b.y/ROWS)*100},80%,${lightness}%)`;ctx.fillRect(b.x,b.y,BRICK_W,BRICK_H);}}));}
     const drawPaddle=()=>{ctx.fillStyle='#0f9';ctx.fillRect(paddle.x,PADDLE_Y,paddle.w,paddle.h);} ;
-    const drawBalls=()=>{balls.forEach(ball=>{ctx.beginPath();ctx.arc(ball.x,ball.y,BALL_RADIUS,0,Math.PI*2);ctx.fillStyle='#f60';ctx.fill();})};
+    const drawBalls=()=>{balls.forEach(ball=>{ctx.beginPath();ctx.arc(ball.x,ball.y,BALL_RADIUS,0,Math.PI*2);ctx.fillStyle=powerBallActive?'#ff0':'#f60';ctx.fill();if(powerBallActive){ctx.strokeStyle='#f60';ctx.lineWidth=2;ctx.stroke();}});};
     function drawHUD(){ctx.fillStyle='#fff';ctx.font='16px sans-serif';ctx.fillText(`SCORE: ${score}`,20,24);ctx.fillText(`HIGH: ${highScore}`,W-150,24);ctx.fillText(`LIVES: ${lives}`,20,46);ctx.fillText(`STAGE: ${stage}`,W-150,46);} 
 
     /* Collision & Win */
-    function collision(){for(const ball of balls){for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const b=bricks[r][c];if(!b.status)continue;if(ball.x>b.x&&ball.x<b.x+BRICK_W&&ball.y-BALL_RADIUS<b.y+BRICK_H&&ball.y+BALL_RADIUS>b.y){ball.dy=-ball.dy;b.status=0;score+=10;spawnParticles(b.x+BRICK_W/2,b.y+BRICK_H/2);spawnItem(b.x+BRICK_W/2,b.y+BRICK_H/2);beep(800,0.05,'sawtooth');if(bricks.flat().every(v=>!v.status))stageClear();return;}}
+    function collision(){for(const ball of balls){for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const b=bricks[r][c];if(b.hp<1)continue;if(ball.x>b.x&&ball.x<b.x+BRICK_W&&ball.y-BALL_RADIUS<b.y+BRICK_H&&ball.y+BALL_RADIUS>b.y){if(!powerBallActive)ball.dy=-ball.dy;b.hp--;score+=10;if(b.hp<1){spawnParticles(b.x+BRICK_W/2,b.y+BRICK_H/2);spawnItem(b.x+BRICK_W/2,b.y+BRICK_H/2);}beep(800,0.05,'sawtooth');if(bricks.flat().every(v=>v.hp<1))stageClear();return;}}
       if(!ballAttached&&ball.x>paddle.x&&ball.x<paddle.x+paddle.w&&ball.y+BALL_RADIUS>PADDLE_Y&&ball.y-BALL_RADIUS<PADDLE_Y+PADDLE_H){const rel=(ball.x-(paddle.x+paddle.w/2))/(paddle.w/2);ball.dx=BALL_SPEED*rel;ball.dy=-Math.abs(ball.dy);beep(500,0.04,'square');}}}
 
     /* End */
